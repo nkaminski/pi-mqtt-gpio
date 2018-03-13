@@ -22,10 +22,11 @@ LOG_LEVEL_MAP = {
     mqtt.MQTT_LOG_ERR: logging.ERROR,
     mqtt.MQTT_LOG_DEBUG: logging.DEBUG
 }
+LOOP_INTERVAL = 0.1
 RECONNECT_DELAY_SECS = 5
 GPIO_MODULES = {}
 GPIO_CONFIGS = {}
-LAST_STATES = {}
+INPUT_STATES = {}
 SET_TOPIC = "set"
 SET_ON_MS_TOPIC = "set_on_ms"
 SET_OFF_MS_TOPIC = "set_off_ms"
@@ -78,6 +79,43 @@ class ConfigValidator(cerberus.Validator):
         """
         return str(value)
 
+class InputState():
+    def __init__(self, default=False, on_hysteresis=0, off_hysteresis=0):
+        self.update=True
+        self.state=default
+        self.counter=0
+        self.on_hyst=on_hysteresis
+        self.off_hyst=off_hysteresis
+
+    def set_hysteresis(self, on, off):
+        self.on_hyst = on
+        self.off_hyst = off
+
+    def set_state(self, state):
+        if self.state == state:
+            self.counter = 0
+            return self.state
+
+        if (state == False) and (self.counter == self.off_hyst):
+            pass
+        elif (state == True) and (self.counter == self.on_hyst):
+            pass
+        else:
+            self.counter += 1
+            return self.state
+
+        self.state = state
+        self.counter = 0
+        self.update = True
+        return state
+
+    def check_clear_update(self):
+        u = self.update
+        self.update=False
+        return u
+
+    def get_state(self):
+        return self.state
 
 def on_log(client, userdata, level, buf):
     """
@@ -458,7 +496,8 @@ if __name__ == "__main__":
 
     for in_conf in digital_inputs:
         initialise_digital_input(in_conf, GPIO_MODULES[in_conf["module"]])
-        LAST_STATES[in_conf["name"]] = None
+        INPUT_STATES[in_conf["name"]] = InputState(on_hysteresis=int(in_conf["on_hysteresis"]/LOOP_INTERVAL),
+                                                    off_hysteresis=int(in_conf["off_hysteresis"]/LOOP_INTERVAL))
 
     for out_conf in digital_outputs:
         initialise_digital_output(out_conf, GPIO_MODULES[out_conf["module"]])
@@ -477,11 +516,13 @@ if __name__ == "__main__":
         while True:
             for in_conf in digital_inputs:
                 gpio = GPIO_MODULES[in_conf["module"]]
+                ist = INPUT_STATES[in_conf["name"]]
                 state = bool(gpio.get_pin(in_conf["pin"]))
                 sleep(0.01)
                 if bool(gpio.get_pin(in_conf["pin"])) != state:
                     continue
-                if state != LAST_STATES[in_conf["name"]]:
+                ist.set_state(state)
+                if ist.check_clear_update():
                     _LOG.info(
                         "Input %r state changed to %r",
                         in_conf["name"],
@@ -494,9 +535,8 @@ if __name__ == "__main__":
                                  else in_conf["off_payload"]),
                         retain=in_conf["retain"]
                     )
-                    LAST_STATES[in_conf["name"]] = state
             scheduler.loop()
-            sleep(0.01)
+            sleep(LOOP_INTERVAL)
     except KeyboardInterrupt:
         print("")
     finally:
