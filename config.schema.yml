@@ -103,6 +103,16 @@ digital_inputs:
         type: string
         required: yes
         empty: no
+      on_hysteresis:
+        type: integer
+        required: no
+        min: 0
+        default: 0
+      off_hysteresis:
+        type: integer
+        required: no
+        min: 0
+        default: 0
       pullup:
         type: boolean
         required: no
