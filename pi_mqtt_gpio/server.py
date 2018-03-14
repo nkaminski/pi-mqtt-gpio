@@ -22,7 +22,7 @@ LOG_LEVEL_MAP = {
     mqtt.MQTT_LOG_ERR: logging.ERROR,
     mqtt.MQTT_LOG_DEBUG: logging.DEBUG
 }
-LOOP_INTERVAL = 0.1
+POLL_INTERVAL = 100
 RECONNECT_DELAY_SECS = 5
 GPIO_MODULES = {}
 GPIO_CONFIGS = {}
@@ -477,6 +477,7 @@ if __name__ == "__main__":
 
     digital_inputs = config["digital_inputs"]
     digital_outputs = config["digital_outputs"]
+    POLL_INTERVAL = config["poll_interval_ms"]
 
     client = init_mqtt(config["mqtt"], config["digital_outputs"])
 
@@ -496,8 +497,8 @@ if __name__ == "__main__":
 
     for in_conf in digital_inputs:
         initialise_digital_input(in_conf, GPIO_MODULES[in_conf["module"]])
-        INPUT_STATES[in_conf["name"]] = InputState(on_hysteresis=int(in_conf["on_hysteresis"]/LOOP_INTERVAL),
-                                                    off_hysteresis=int(in_conf["off_hysteresis"]/LOOP_INTERVAL))
+        INPUT_STATES[in_conf["name"]] = InputState(on_hysteresis=int(in_conf["on_hysteresis"]/POLL_INTERVAL),
+                                                    off_hysteresis=int(in_conf["off_hysteresis"]/POLL_INTERVAL))
 
     for out_conf in digital_outputs:
         initialise_digital_output(out_conf, GPIO_MODULES[out_conf["module"]])
@@ -536,7 +537,7 @@ if __name__ == "__main__":
                         retain=in_conf["retain"]
                     )
             scheduler.loop()
-            sleep(LOOP_INTERVAL)
+            sleep(POLL_INTERVAL/1000.0)
     except KeyboardInterrupt:
         print("")
     finally:

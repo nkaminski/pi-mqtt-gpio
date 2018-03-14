@@ -76,6 +76,12 @@ gpio_modules:
         required: no
         default: yes
 
+poll_interval_ms:
+  type: integer
+  required: no
+  default: 50
+  min: 0
+
 digital_inputs:
   type: list
   required: no
